@@ -1,14 +1,28 @@
 <template>
   <div class="blog-posts-container">
-    <h2 class="blog-posts-title">Blog Posts</h2>
+    <div class="blog-posts-header">
+      <h2 class="blog-posts-title">Blog Posts</h2>
+      <!-- Filter by status -->
+      <select v-model="selectedStatus" class="status-filter">
+        <option value="all">All Posts</option>
+        <option value="published">Published</option>
+        <option value="unpublished">Unpublished</option>
+      </select>
+    </div>
+
     <!-- Loading spinner for data fetching -->
     <div v-if="isLoading" class="loading-spinner">
       <div class="spinner"></div>
       <p>Loading blog posts...</p>
     </div>
+    
     <!-- Blog Post Cards -->
-    <div v-if="blogPosts.length > 0" class="blog-posts-grid">
-      <div v-for="post in blogPosts" :key="post.id" class="blog-post-card">
+    <div v-if="filteredBlogPosts.length > 0" class="blog-posts-grid">
+      <div
+        v-for="post in filteredBlogPosts"
+        :key="post.id"
+        class="blog-post-card"
+      >
         <div class="blog-post-content">
           <h3 class="blog-post-title">{{ post.title }}</h3>
           <p class="blog-post-author">By {{ post.author }}</p>
@@ -36,8 +50,18 @@
         <h3>Confirm Deletion</h3>
         <p>Are you sure you want to delete this blog post?</p>
         <div class="modal-actions">
-          <button @click="cancelDelete" class="btn cancel-btn" :disabled="isDeleting">Cancel</button>
-          <button @click="proceedDelete" class="btn confirm-btn" :disabled="isDeleting">
+          <button
+            @click="cancelDelete"
+            class="btn cancel-btn"
+            :disabled="isDeleting"
+          >
+            Cancel
+          </button>
+          <button
+            @click="proceedDelete"
+            class="btn confirm-btn"
+            :disabled="isDeleting"
+          >
             <span v-if="!isDeleting">Delete</span>
             <div v-else class="spinner spinner-small"></div>
           </button>
@@ -48,9 +72,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useApi } from '~/composables/useApi';
-import { BlogPost } from '~/types/BlogPost';
+import { ref, onMounted, computed } from "vue";
+import { useApi } from "~/composables/useApi";
+import { BlogPost } from "~/types/BlogPost";
 
 /**
  * The loading state of the component.
@@ -83,6 +107,11 @@ const showConfirmModal = ref(false);
 const postToDelete = ref<number | null>(null);
 
 /**
+ * The blog post to be filtered.
+ */
+const selectedStatus = ref("all");
+
+/**
  * Fetches the blog posts from the API and stores them in the component state.
  * The blog posts are stored in the blogPosts array.
  * If there is an error while fetching, the error message is logged to the console.
@@ -90,14 +119,21 @@ const postToDelete = ref<number | null>(null);
 const fetchBlogPosts = async () => {
   isLoading.value = true;
   try {
-    const response = await fetchData('blogs');
+    const response = await fetchData("blogs");
     blogPosts.value = response.data || [];
   } catch (error) {
-    console.error('Failed to fetch blog posts:', error);
+    console.error("Failed to fetch blog posts:", error);
   } finally {
     isLoading.value = false;
   }
 };
+
+const filteredBlogPosts = computed(() => {
+  if (selectedStatus.value === "all") {
+    return blogPosts.value;
+  }
+  return blogPosts.value.filter((post) => post.status === selectedStatus.value);
+});
 
 /**
  * Fetches the blog posts when the component is mounted.
@@ -142,19 +178,18 @@ const proceedDelete = async () => {
   if (postToDelete.value) {
     isDeleting.value = true;
     try {
-      await fetchData(`blogs/${postToDelete.value}`, { method: 'DELETE' });
-      clearCache('blogs');  // Clear the cache
-      await fetchBlogPosts();  // Re-fetch the data
+      await fetchData(`blogs/${postToDelete.value}`, { method: "DELETE" });
+      clearCache("blogs"); // Clear the cache
+      await fetchBlogPosts(); // Re-fetch the data
       showConfirmModal.value = false;
       postToDelete.value = null;
     } catch (error) {
-      console.error('Failed to delete the post:', error);
+      console.error("Failed to delete the post:", error);
     } finally {
       isDeleting.value = false;
     }
   }
 };
-
 
 /**
  * Truncates the content to the specified maximum length and adds ellipsis if necessary.
@@ -165,7 +200,7 @@ const proceedDelete = async () => {
  */
 const truncateContent = (content: string, maxLength: number = 100) => {
   if (content.length <= maxLength) return content;
-  return content.slice(0, maxLength) + '...';
+  return content.slice(0, maxLength) + "...";
 };
 </script>
 
@@ -173,6 +208,7 @@ const truncateContent = (content: string, maxLength: number = 100) => {
 .blog-posts-container {
   padding: 10px 20px;
   width: 100%;
+  position: relative;
 }
 
 .blog-posts-title {
@@ -195,7 +231,9 @@ const truncateContent = (content: string, maxLength: number = 100) => {
   border-radius: 12px;
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
   overflow: hidden;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
   display: flex;
   flex-direction: column;
 }
@@ -400,8 +438,12 @@ const truncateContent = (content: string, maxLength: number = 100) => {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .loading-spinner p {
@@ -413,5 +455,28 @@ const truncateContent = (content: string, maxLength: number = 100) => {
 .btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.blog-posts-header {
+  position: relative;
+}
+
+.status-filter {
+  margin-bottom: 20px;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
+  color: #333;
+  cursor: pointer;
+  position: absolute;
+  top: 0;
+  right: 20px;
+}
+
+.status-filter:focus {
+  outline: none;
+  border-color: #3498db;
 }
 </style>
